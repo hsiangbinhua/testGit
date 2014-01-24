@@ -1,0 +1,328 @@
+﻿dubbo处理文件上传
+
+ 
+
+ 
+
+ 
+
+ 
+
+dubbo和hessian的maven依赖：
+
+ 
+
+		<dependency>
+			<groupId>com.alibaba</groupId>
+			<artifactId>dubbo</artifactId>
+			<version>2.5.3</version>
+		</dependency>
+		<dependency>
+			<groupId>com.caucho</groupId>
+			<artifactId>hessian</artifactId>
+			<version>4.0.7</version>
+		</dependency>
+
+ 
+
+ 
+
+ 
+
+服务提供者（项目名称：provider）
+
+ 
+
+首先是web.xml配置（使用spring）：
+
+ 
+
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app version="2.5" xmlns="http://java.sun.com/xml/ns/javaee"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://java.sun.com/xml/ns/javaee 
+	http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
+	<context-param>
+		<param-name>contextConfigLocation</param-name>
+		<param-value>classpath*:applicationContext.xml</param-value>
+	</context-param>
+	<listener>
+		<listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+	</listener>
+	<servlet>
+		<servlet-name>dubbo</servlet-name>
+		<servlet-class>com.alibaba.dubbo.remoting.http.servlet.DispatcherServlet</servlet-class>
+		<load-on-startup>1</load-on-startup>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>dubbo</servlet-name>
+		<url-pattern>/*</url-pattern>
+	</servlet-mapping>
+
+</web-app>
+
+ 
+
+ 
+
+ 
+
+然后是服务接口：
+
+ 
+
+package com.tch.test.dubbo.service;
+
+import java.io.InputStream;
+
+public interface DemoService {
+	
+    String sayHello(String name);
+
+    /**
+     * 处理上传
+     * @param in
+     * @return
+     */
+    String upload(String destPath,InputStream in);
+
+
+}
+
+ 
+
+ 
+
+服务实现类：
+
+ 
+
+package com.tch.test.dubbo.service;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+
+public class DemoServiceImpl implements DemoService {
+
+    public String sayHello(String name) {
+        return "Hello " + name;
+    }
+
+	@Override
+	public String upload(String destPath,InputStream in) {
+		try {
+			FileOutputStream out = new FileOutputStream("E:\\temp\\a.js");
+			int n = -1;
+			byte[] b = new byte[10240];
+			while((n=in.read(b)) != -1){
+				System.out.println(new String(b,0,n,"utf-8"));
+				out.write(b, 0, n);
+			}
+			out.close();
+			out.flush();
+			in.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return "upload complete !";
+	}
+
+}
+
+ 
+
+ 
+
+最重要的applicationContext.xml ：
+
+ 
+
+参考：dubbo hessian协议
+
+ 
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:dubbo="http://code.alibabatech.com/schema/dubbo" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context" xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-2.5.xsd
+				http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-2.5.xsd
+        			http://code.alibabatech.com/schema/dubbo http://code.alibabatech.com/schema/dubbo/dubbo.xsd
+				http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-2.5.xsd">
+	<!-- 提供方应用信息，用于计算依赖关系 -->
+    <dubbo:application name="hello-world-app"  />
+    <!-- 使用multicast广播注册中心暴露服务地址 -->
+    <dubbo:registry address="multicast://224.5.6.7:1234" />
+    <!-- 用hessian协议在8080(servlet容器的端口)端口暴露服务，contextpath是项目名称，server这里是使用的web.xml里面配置的servlet -->
+    <dubbo:protocol name="hessian" port="8080" contextpath="dubbo" server="servlet"/>
+    <!-- 声明需要暴露的服务接口 -->
+    <dubbo:service interface="com.tch.test.dubbo.service.DemoService" ref="demoService" />
+    <!-- 和本地bean一样实现服务 -->
+    <bean id="demoService" class="com.tch.test.dubbo.service.DemoServiceImpl" />
+	
+</beans>
+
+ 
+
+启动项目之后，就同时启动了服务。。。
+
+ 
+
+ 
+
+ 
+
+ 
+
+下面是 consumer ：
+
+ 
+
+首先是服务接口：
+
+ 
+
+package com.tch.test.dubbo.service;
+
+import java.io.InputStream;
+
+public interface DemoService {
+	
+    String sayHello(String name);
+
+    /**
+     * 上传
+     * @param in
+     */
+    String upload(String destPath,InputStream in);
+    
+}
+
+ 
+
+ 
+
+ 
+
+然后是applicationContext.xml ：
+
+ 
+
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:dubbo="http://code.alibabatech.com/schema/dubbo"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://code.alibabatech.com/schema/dubbo
+        http://code.alibabatech.com/schema/dubbo/dubbo.xsd
+        ">
+	<!-- 消费方应用名，用于计算依赖关系，不是匹配条件，不要与提供方一样 -->
+	<dubbo:application name="consumer-of-helloworld-app" />
+
+	<!-- 使用multicast广播注册中心暴露发现服务地址 -->
+	<dubbo:registry address="multicast://224.5.6.7:1234" />
+
+	<!-- 生成远程服务代理，可以和本地bean一样使用demoService -->
+	<dubbo:reference id="demoService"
+		interface="com.tch.test.dubbo.service.DemoService" />
+
+</beans>
+
+ 
+
+ 
+
+好了，开始调用provider提供的服务：
+
+ 
+
+package com.tch.test.dubbo.service;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+public class Consumer {
+    public static void main(String[] args) throws Exception {
+        ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext(new String[] {"applicationContext.xml"});
+        context.start();
+        DemoService demoService = (DemoService)context.getBean("demoService"); // 获取远程服务代理
+        sayHello(demoService);  //sayHello
+        upload(demoService);    //upload
+        
+        context.close();
+    }
+    //调用sayHello
+    public static void sayHello(DemoService demoService){
+    	String result = demoService.sayHello(" dubbo "); // 执行远程方法
+        System.out.println(result); // 显示调用结果
+    }
+    //调用upload
+    public static void upload(DemoService demoService) throws FileNotFoundException{
+    	String result = demoService.upload("E:\\temp\\a.js",new FileInputStream("E:\\temp\\dubbo.xml")); // 执行远程方法
+        System.out.println(result); // 显示调用结果
+    }
+    
+
+}
+
+ 
+
+ 
+
+ 
+
+就可以看到上传成功的结果了。。。
+
+
+hessian://
+
+(+) (#)
+	Hessian协议用于集成Hessian的服务，Hessian底层采用Http通讯，采用Servlet暴露服务，Dubbo缺省内嵌Jetty作为服务器实现。
+	Hessian是Caucho开源的一个RPC框架：http://hessian.caucho.com，其通讯效率高于WebService和Java自带的序列化。
+
+依赖：
+
+可以和原生Hessian服务互操作，即：
+
+    提供者用Dubbo的Hessian协议暴露服务，消费者直接用标准Hessian接口调用，
+    或者提供方用标准Hessian暴露服务，消费方用Dubbo的Hessian协议调用。
+
+基于Hessian的远程调用协议。
+
+    连接个数：多连接
+    连接方式：短连接
+    传输协议：HTTP
+    传输方式：同步传输
+    序列化：Hessian二进制序列化
+    适用范围：传入传出参数数据包较大，提供者比消费者个数多，提供者压力较大，可传文件。
+    适用场景：页面传输，文件传输，或与原生hessian服务互操作
+
+(1) 约束：
+
+    参数及返回值需实现Serializable接口
+    参数及返回值不能自定义实现List, Map, Number, Date, Calendar等接口，只能用JDK自带的实现，因为hessian会做特殊处理，自定义实现类中的属性值都会丢失。
+
+(2) 配置：
+Define hessian protocol:
+
+Set default protocol:
+
+Set service protocol:
+
+Multi port:
+
+Directly provider:
+h4. Jetty Server: (default)
+h4. Servlet Bridge Server: (recommend)
+
+web.xml：
+
+注意，如果使用servlet派发请求：
+
+    协议的端口<dubbo:protocol port="8080" />必须与servlet容器的端口相同，
+    协议的上下文路径<dubbo:protocol contextpath="foo" />必须与servlet应用的上下文路径相同。
