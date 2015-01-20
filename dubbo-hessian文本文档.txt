@@ -1,16 +1,7 @@
 ﻿dubbo处理文件上传
 
- 
-
- 
-
- 
-
- 
 
 dubbo和hessian的maven依赖：
-
- 
 
 		<dependency>
 			<groupId>com.alibaba</groupId>
@@ -22,17 +13,11 @@ dubbo和hessian的maven依赖：
 			<artifactId>hessian</artifactId>
 			<version>4.0.7</version>
 		</dependency>
-
- 
-
- 
-
  
 
 服务提供者（项目名称：provider）
 
  
-
 首先是web.xml配置（使用spring）：
 
  
